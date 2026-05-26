@@ -1,15 +1,9 @@
-import {
-  ID,
-  Query,
-  Permission as ClientPermission,
-  Role as ClientRole,
-  ExecutionMethod,
-  Channel,
-} from 'appwrite'
+import { Channel } from 'appwrite'
 import type { Models } from 'appwrite'
-import { Permission, Role } from 'node-appwrite'
+import { ExecutionMethod, ID, Permission, Query, Role } from 'node-appwrite'
+import { InputFile } from 'node-appwrite/file'
 import { createServerFn } from '@tanstack/react-start'
-import { storage, tablesDB, functions, realtime } from './client'
+import { functions, realtime } from './client'
 import { createSessionClient, createAdminClient } from './server'
 import { appwrite } from './config'
 
@@ -26,21 +20,41 @@ export type InboxSnap = Omit<Snap, 'fileId'> & {
 
 export const SNAP_RECEIVED_EVENT = 'appchat:snap-received'
 
-export const createSnapRow = createServerFn({ method: 'POST' })
-  .inputValidator((data: { recipientId: string; fileId: string }) => data)
+type SendSnapInput = {
+  recipientId: string
+  fileName: string
+  mimeType: string
+  base64: string
+}
+
+const ALLOWED_SNAP_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
+
+export const sendSnapServer = createServerFn({ method: 'POST' })
+  .inputValidator((data: SendSnapInput) => data)
   .handler(async ({ data }) => {
     const { account } = createSessionClient()
     const me = await account.get()
-    const { tablesDB: admin } = createAdminClient()
+    const { storage: adminStorage, tablesDB: adminTables } = createAdminClient()
+    if (!ALLOWED_SNAP_TYPES.has(data.mimeType)) {
+      throw new Error('choose a PNG, JPEG, or WebP image')
+    }
 
-    const row = await admin.createRow({
+    const bytes = Uint8Array.from(Buffer.from(data.base64, 'base64'))
+    const uploaded = await adminStorage.createFile({
+      bucketId: appwrite.buckets.snaps,
+      fileId: ID.unique(),
+      file: InputFile.fromBuffer(bytes, data.fileName),
+      permissions: [Permission.read(Role.user(me.$id))],
+    })
+
+    const row = await adminTables.createRow({
       databaseId: appwrite.databaseId,
       tableId: appwrite.tables.snaps,
       rowId: ID.unique(),
       data: {
         senderId: me.$id,
         recipientId: data.recipientId,
-        fileId: data.fileId,
+        fileId: uploaded.$id,
         viewedAt: null,
       },
       permissions: [
@@ -53,18 +67,26 @@ export const createSnapRow = createServerFn({ method: 'POST' })
     return JSON.parse(JSON.stringify(row)) as Snap
   })
 
-export async function sendSnap(
-  senderId: string,
-  recipientId: string,
-  file: File,
-): Promise<Snap> {
-  const uploaded = await storage.createFile({
-    bucketId: appwrite.buckets.snaps,
-    fileId: ID.unique(),
-    file,
-    permissions: [ClientPermission.read(ClientRole.user(senderId))],
+export async function sendSnap(recipientId: string, file: File): Promise<Snap> {
+  const base64 = await fileToBase64(file)
+  return sendSnapServer({
+    data: {
+      recipientId,
+      fileName: file.name || 'snap',
+      mimeType: file.type,
+      base64,
+    },
   })
-  return createSnapRow({ data: { recipientId, fileId: uploaded.$id } })
+}
+
+async function fileToBase64(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer()
+  let binary = ''
+  const bytes = new Uint8Array(buffer)
+  for (let i = 0; i < bytes.byteLength; i += 1) {
+    binary += String.fromCharCode(bytes[i])
+  }
+  return btoa(binary)
 }
 
 export const listInboxSnaps = createServerFn({ method: 'GET' })
@@ -106,16 +128,54 @@ export const listInboxSnaps = createServerFn({ method: 'GET' })
     return JSON.parse(JSON.stringify(snaps)) as InboxSnap[]
   })
 
-export async function markSnapViewed(snapId: string) {
-  await tablesDB.updateRow({
-    databaseId: appwrite.databaseId,
-    tableId: appwrite.tables.snaps,
-    rowId: snapId,
-    data: { viewedAt: new Date().toISOString() },
+export const markSnapViewedServer = createServerFn({ method: 'POST' })
+  .inputValidator((data: { snapId: string }) => data)
+  .handler(async ({ data }) => {
+    const { account, tablesDB: sessionTablesDB } = createSessionClient()
+    await account.get()
+    await sessionTablesDB.updateRow({
+      databaseId: appwrite.databaseId,
+      tableId: appwrite.tables.snaps,
+      rowId: data.snapId,
+      data: { viewedAt: new Date().toISOString() },
+    })
+    return { ok: true }
   })
+
+export async function markSnapViewed(snapId: string) {
+  await markSnapViewedServer({ data: { snapId } })
 }
 
+export const fetchSnapImageServer = createServerFn({ method: 'GET' })
+  .inputValidator((data: { snapId: string }) => data)
+  .handler(async ({ data }) => {
+    const { account, functions: sessionFunctions } = createSessionClient()
+    await account.get()
+    const jwt = await account.createJWT()
+    const exec = await sessionFunctions.createExecution({
+      functionId: appwrite.functions.serveSnap,
+      xpath: `/snap/${data.snapId}?token=${encodeURIComponent(jwt.jwt)}`,
+      method: ExecutionMethod.GET,
+    })
+    if (exec.responseStatusCode !== 200) {
+      throw new Error(
+        `snap ${data.snapId} unavailable (${exec.responseStatusCode})`,
+      )
+    }
+    const { contentType, base64 } = JSON.parse(exec.responseBody) as {
+      contentType: string
+      base64: string
+    }
+    return `data:${contentType};base64,${base64}`
+  })
+
 export async function fetchSnapImage(snapId: string): Promise<string> {
+  return fetchSnapImageServer({ data: { snapId } })
+}
+
+export async function fetchSnapImageFromBrowserSession(
+  snapId: string,
+): Promise<string> {
   const exec = await functions.createExecution({
     functionId: appwrite.functions.serveSnap,
     xpath: `/snap/${snapId}`,

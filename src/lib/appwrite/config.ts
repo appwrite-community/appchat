@@ -1,6 +1,8 @@
 export const appwrite = {
-  endpoint: 'http://localhost/v1',
-  projectId: 'appchat',
+  endpoint:
+    import.meta.env.VITE_APPWRITE_ENDPOINT ??
+    'https://fra.cloud.appwrite.io/v1',
+  projectId: import.meta.env.VITE_APPWRITE_PROJECT_ID ?? 'appchat-demo',
   databaseId: 'appchat-db',
   tables: {
     snaps: 'snaps',

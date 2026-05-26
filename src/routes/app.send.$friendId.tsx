@@ -1,8 +1,7 @@
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { ChangeEvent, DragEvent } from 'react'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { sendSnap } from '#/lib/appwrite/snaps'
-import { Route as AppRoute } from './app'
 
 const ACCEPTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp'])
 
@@ -12,9 +11,9 @@ export const Route = createFileRoute('/app/send/$friendId')({
 
 function SendSnapPage() {
   const router = useRouter()
-  const { user } = AppRoute.useLoaderData()
   const { friendId } = Route.useParams()
   const fileInputId = useId()
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -62,12 +61,16 @@ function SendSnapPage() {
     selectFile(e.dataTransfer.files[0])
   }
 
+  function openFilePicker() {
+    fileInputRef.current?.click()
+  }
+
   async function send() {
     if (!file) return
     setBusy(true)
     setError(null)
     try {
-      await sendSnap(user.$id, friendId, file)
+      await sendSnap(friendId, file)
       await router.navigate({ to: '/app/friends' })
     } catch (e) {
       setError(e instanceof Error ? e.message : 'failed')
@@ -81,11 +84,12 @@ function SendSnapPage() {
 
       <div className="rounded-2xl bg-[var(--appchat-surface)] border border-[var(--appchat-border)] p-5 space-y-4">
         <input
+          ref={fileInputRef}
           id={fileInputId}
           type="file"
           accept="image/png,image/jpeg,image/webp"
           onChange={pick}
-          className="sr-only"
+          className="hidden"
         />
 
         <div
@@ -100,8 +104,9 @@ function SendSnapPage() {
           }`}
         >
           {preview ? (
-            <label
-              htmlFor={fileInputId}
+            <button
+              type="button"
+              onClick={openFilePicker}
               className="relative block w-full h-full group text-left cursor-pointer"
             >
               <img
@@ -112,27 +117,29 @@ function SendSnapPage() {
               <span className="absolute inset-x-0 bottom-0 px-4 py-3 bg-black/65 text-sm text-white opacity-0 group-hover:opacity-100 transition-opacity">
                 Click or drop to replace
               </span>
-            </label>
+            </button>
           ) : (
-            <label
-              htmlFor={fileInputId}
+            <button
+              type="button"
+              onClick={openFilePicker}
               className="w-full h-full flex flex-col items-center justify-center gap-2 text-[var(--appchat-muted)] cursor-pointer"
             >
               <span className="font-display text-lg font-bold text-white">
                 Choose a photo
               </span>
               <span className="text-sm">Click or drag an image here</span>
-            </label>
+            </button>
           )}
         </div>
 
         {preview && (
-          <label
-            htmlFor={fileInputId}
+          <button
+            type="button"
+            onClick={openFilePicker}
             className="inline-block text-sm text-[var(--appchat-muted)] cursor-pointer hover:text-white"
           >
             Choose another
-          </label>
+          </button>
         )}
 
         {error && <p className="text-sm text-red-400">{error}</p>}

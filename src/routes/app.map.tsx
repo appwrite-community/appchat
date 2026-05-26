@@ -11,6 +11,7 @@ import {
 import type { PresenceMetadata, PresenceRecord } from '#/lib/appwrite/presence'
 import { listInboxSnaps, SNAP_RECEIVED_EVENT } from '#/lib/appwrite/snaps'
 import type { Snap } from '#/lib/appwrite/snaps'
+import { listMyFriends } from '#/lib/appwrite/friends'
 import { Route as AppRoute } from './app'
 
 const LOCATION_KEY = 'appchat:my-location'
@@ -25,6 +26,7 @@ function MapPage() {
   const { user } = AppRoute.useLoaderData()
   const [presences, setPresences] = useState<PresenceRecord[]>([])
   const [myLoc, setMyLoc] = useState<Location | null>(null)
+  const [friendIds, setFriendIds] = useState<Set<string>>(new Set())
   const [snapSenderIds, setSnapSenderIds] = useState<Set<string>>(new Set())
   const [isMovingPin, setIsMovingPin] = useState(false)
   const myLocRef = useRef<Location | null>(null)
@@ -49,6 +51,10 @@ function MapPage() {
   }, [myLoc])
 
   useEffect(() => {
+    listMyFriends({ data: { userId: user.$id } })
+      .then((friends) => setFriendIds(new Set(friends.map((f) => f.friendId))))
+      .catch(() => setFriendIds(new Set()))
+
     listLivePresences()
       .then((rows) => {
         const ownPresence = rows.find((r) => r.userId === user.$id)
@@ -127,7 +133,9 @@ function MapPage() {
     const mapped = presences
       .filter(
         (p) =>
-          Number.isFinite(p.metadata.lat) && Number.isFinite(p.metadata.lng),
+          (p.userId === user.$id || friendIds.has(p.userId)) &&
+          Number.isFinite(p.metadata.lat) &&
+          Number.isFinite(p.metadata.lng),
       )
       .map((p) => {
         const metadata = p.userId === user.$id && myMeta ? myMeta : p.metadata
@@ -153,7 +161,7 @@ function MapPage() {
     }
 
     return mapped.sort((a, b) => Number(a.isMe) - Number(b.isMe))
-  }, [myLoc, presences, user])
+  }, [friendIds, myLoc, presences, user])
 
   const liveFriendCount = pins.filter((p) => !p.isMe).length
   const canPickLocation = !myLoc || isMovingPin

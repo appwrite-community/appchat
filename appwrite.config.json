@@ -1,7 +1,156 @@
 {
-  "projectId": "appchat",
+  "projectId": "appchat-demo",
   "projectName": "AppChat",
-  "endpoint": "http://localhost/v1",
+  "endpoint": "https://fra.cloud.appwrite.io/v1",
+  "tablesDB": [
+    {
+      "$id": "appchat-db",
+      "name": "AppChat",
+      "enabled": true
+    }
+  ],
+  "tables": [
+    {
+      "$id": "snaps",
+      "databaseId": "appchat-db",
+      "name": "Snaps",
+      "enabled": true,
+      "rowSecurity": true,
+      "columns": [
+        {
+          "key": "senderId",
+          "type": "varchar",
+          "size": 64,
+          "required": true
+        },
+        {
+          "key": "recipientId",
+          "type": "varchar",
+          "size": 64,
+          "required": true
+        },
+        {
+          "key": "fileId",
+          "type": "varchar",
+          "size": 64,
+          "required": true
+        },
+        {
+          "key": "viewedAt",
+          "type": "datetime",
+          "required": false
+        }
+      ],
+      "indexes": [
+        {
+          "key": "recipientId",
+          "type": "key",
+          "columns": ["recipientId"]
+        },
+        {
+          "key": "senderId",
+          "type": "key",
+          "columns": ["senderId"]
+        }
+      ]
+    },
+    {
+      "$id": "friendRequests",
+      "databaseId": "appchat-db",
+      "name": "Friend requests",
+      "enabled": true,
+      "rowSecurity": true,
+      "columns": [
+        {
+          "key": "fromUserId",
+          "type": "varchar",
+          "size": 64,
+          "required": true
+        },
+        {
+          "key": "toUserId",
+          "type": "varchar",
+          "size": 64,
+          "required": true
+        },
+        {
+          "key": "status",
+          "type": "varchar",
+          "size": 16,
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "toUserId",
+          "type": "key",
+          "columns": ["toUserId"]
+        },
+        {
+          "key": "fromUserId",
+          "type": "key",
+          "columns": ["fromUserId"]
+        },
+        {
+          "key": "toUserId_status",
+          "type": "key",
+          "columns": ["toUserId", "status"]
+        }
+      ]
+    },
+    {
+      "$id": "friendships",
+      "databaseId": "appchat-db",
+      "name": "Friendships",
+      "enabled": true,
+      "rowSecurity": true,
+      "columns": [
+        {
+          "key": "userA",
+          "type": "varchar",
+          "size": 64,
+          "required": true
+        },
+        {
+          "key": "userB",
+          "type": "varchar",
+          "size": 64,
+          "required": true
+        }
+      ],
+      "indexes": [
+        {
+          "key": "userA",
+          "type": "key",
+          "columns": ["userA"]
+        },
+        {
+          "key": "userB",
+          "type": "key",
+          "columns": ["userB"]
+        },
+        {
+          "key": "user_pair",
+          "type": "unique",
+          "columns": ["userA", "userB"]
+        }
+      ]
+    }
+  ],
+  "buckets": [
+    {
+      "$id": "snaps",
+      "$permissions": ["create(\"any\")"],
+      "fileSecurity": true,
+      "name": "Snaps",
+      "enabled": true,
+      "maximumFileSize": 10485760,
+      "allowedFileExtensions": ["jpg", "jpeg", "png", "gif", "webp"],
+      "compression": "none",
+      "encryption": true,
+      "antivirus": true
+    }
+  ],
   "functions": [
     {
       "$id": "serve-snap",
@@ -29,7 +178,8 @@
       "installCommand": "pnpm install",
       "buildCommand": "pnpm run build",
       "outputDirectory": "./.output",
-      "specification": "s-1vcpu-512mb",
+      "buildSpecification": "s-2vcpu-2gb",
+      "runtimeSpecification": "s-2vcpu-2gb",
       "buildRuntime": "node-22",
       "adapter": "ssr",
       "fallbackFile": "",

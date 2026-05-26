@@ -1,7 +1,7 @@
 import type { Models } from 'appwrite'
 import { createServerFn } from '@tanstack/react-start'
 import { Permission, Role, Presences } from 'node-appwrite'
-import { client, presences, realtime, avatars } from './client'
+import { client, realtime, avatars } from './client'
 import { createAdminClient, createSessionClient } from './server'
 import { appwrite } from './config'
 
@@ -54,9 +54,18 @@ export async function upsertMyPresence(metadata: PresenceMetadata) {
   return upsertPresenceServer({ data: { metadata } })
 }
 
+export const listLivePresencesServer = createServerFn({
+  method: 'GET',
+}).handler(async () => {
+  const { account, client: sessionClient } = createSessionClient()
+  await account.get()
+  const sessionPresences = new Presences(sessionClient)
+  const result = await sessionPresences.list()
+  return JSON.parse(JSON.stringify(result.presences)) as PresenceRecord[]
+})
+
 export async function listLivePresences(): Promise<PresenceRecord[]> {
-  const result = await presences.list()
-  return result.presences as unknown as PresenceRecord[]
+  return listLivePresencesServer()
 }
 
 export function subscribeToPresences(

@@ -1,4 +1,11 @@
-import { Client, Account, TablesDB, Users } from 'node-appwrite'
+import {
+  Account,
+  Client,
+  Functions,
+  Storage,
+  TablesDB,
+  Users,
+} from 'node-appwrite'
 import { getCookie } from '@tanstack/react-start/server'
 import { appwrite } from './config'
 
@@ -13,6 +20,7 @@ export function createSessionClient() {
     client,
     account: new Account(client),
     tablesDB: new TablesDB(client),
+    functions: new Functions(client),
   }
 }
 
@@ -29,5 +37,7 @@ export function createAdminClient() {
     client,
     users: new Users(client),
     tablesDB: new TablesDB(client),
+    storage: new Storage(client),
+    functions: new Functions(client),
   }
 }

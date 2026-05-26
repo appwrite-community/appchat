@@ -37,7 +37,7 @@ src/components/SnapGlobe.tsx  Globe UI for live presence pins
 
 Create an Appwrite project and use `appwrite.config.json` as the deployment config. The app expects these resource IDs:
 
-- Project: `appchat`
+- Project: `appchat-demo`
 - Database: `appchat-db`
 - Tables: `snaps`, `friendRequests`, `friendships`
 - Bucket: `snaps`
@@ -64,10 +64,15 @@ The app runs on http://localhost:3000.
 ## Deploy
 
 ```bash
-appwrite push
+appwrite --all push tables
+appwrite --all push buckets
+appwrite push functions --function-id serve-snap --activate
+appwrite push sites --site-id appchat-web --activate
 ```
 
-The config deploys the TanStack Start site and the `serve-snap` function together.
+The config deploys the TablesDB schema, Storage bucket, TanStack Start site, and the `serve-snap` function.
+
+For demos, `APPWRITE_API_KEY=... pnpm seed:appwrite` creates Alice and Bob, makes them friends, and drops initial presence pins.
 
 ## Scripts
 
@@ -76,4 +81,5 @@ pnpm lint
 pnpm test
 pnpm build
 pnpm check
+pnpm seed:appwrite
 ```
