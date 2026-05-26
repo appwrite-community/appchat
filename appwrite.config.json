@@ -1,0 +1,39 @@
+{
+  "projectId": "appchat",
+  "projectName": "AppChat",
+  "endpoint": "http://localhost/v1",
+  "functions": [
+    {
+      "$id": "serve-snap",
+      "name": "Serve snap",
+      "runtime": "node-22",
+      "entrypoint": "src/main.js",
+      "commands": "pnpm install",
+      "execute": ["any"],
+      "events": [],
+      "schedule": "",
+      "timeout": 15,
+      "enabled": true,
+      "logging": true,
+      "scopes": ["files.read"],
+      "path": "functions/serve-snap"
+    }
+  ],
+  "sites": [
+    {
+      "$id": "appchat-web",
+      "name": "AppChat",
+      "logging": true,
+      "framework": "tanstack-start",
+      "timeout": 30,
+      "installCommand": "pnpm install",
+      "buildCommand": "pnpm run build",
+      "outputDirectory": "./.output",
+      "specification": "s-1vcpu-512mb",
+      "buildRuntime": "node-22",
+      "adapter": "ssr",
+      "fallbackFile": "",
+      "path": "."
+    }
+  ]
+}
