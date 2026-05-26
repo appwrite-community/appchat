@@ -140,7 +140,7 @@
   "buckets": [
     {
       "$id": "snaps",
-      "$permissions": ["create(\"any\")"],
+      "$permissions": [],
       "fileSecurity": true,
       "name": "Snaps",
       "enabled": true,
