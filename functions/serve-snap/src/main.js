@@ -25,7 +25,11 @@ export default async ({ req, res, log, error }) => {
 
   const endpoint = process.env.APPWRITE_FUNCTION_API_ENDPOINT
   const projectId = process.env.APPWRITE_FUNCTION_PROJECT_ID
-  const apiKey = req.headers['x-appwrite-key']
+  const apiKey = process.env.APPWRITE_API_KEY
+  if (!apiKey) {
+    error('APPWRITE_API_KEY env var is not set')
+    return res.json({ message: 'internal error' }, 500)
+  }
 
   const callerClient = new Client()
     .setEndpoint(endpoint)
@@ -57,13 +61,22 @@ export default async ({ req, res, log, error }) => {
     .setKey(apiKey)
   const adminStorage = new Storage(adminClient)
 
-  const [file, bytes] = await Promise.all([
-    adminStorage.getFile({ bucketId: SNAPS_BUCKET_ID, fileId: snap.fileId }),
-    adminStorage.getFileView({
-      bucketId: SNAPS_BUCKET_ID,
-      fileId: snap.fileId,
-    }),
-  ])
+  let file
+  let bytes
+  try {
+    const result = await Promise.all([
+      adminStorage.getFile({ bucketId: SNAPS_BUCKET_ID, fileId: snap.fileId }),
+      adminStorage.getFileView({
+        bucketId: SNAPS_BUCKET_ID,
+        fileId: snap.fileId,
+      }),
+    ])
+    file = result[0]
+    bytes = result[1]
+  } catch (e) {
+    error(e.message)
+    return res.json({ message: 'internal error' }, 500)
+  }
 
   return res.json(
     {

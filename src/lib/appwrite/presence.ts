@@ -1,6 +1,6 @@
 import type { Models } from 'appwrite'
 import { createServerFn } from '@tanstack/react-start'
-import { Permission, Role, Presences } from 'node-appwrite'
+import { Permission, Query, Role, Presences } from 'node-appwrite'
 import { client, realtime, avatars } from './client'
 import { createAdminClient, createSessionClient } from './server'
 import { appwrite } from './config'
@@ -16,12 +16,41 @@ export type PresenceRecord = Models.Presence & {
   metadata: PresenceMetadata
 }
 
+type FriendshipRow = {
+  userA: string
+  userB: string
+}
+
 function expiresAtFromNow(ms: number): string {
   return new Date(Date.now() + ms).toISOString()
 }
 
 export function avatarUrlFor(name: string): string {
   return avatars.getInitials({ name }).toString()
+}
+
+async function listFriendIdsForPresence(userId: string): Promise<string[]> {
+  const { tablesDB } = createAdminClient()
+  const [asA, asB] = await Promise.all([
+    tablesDB.listRows({
+      databaseId: appwrite.databaseId,
+      tableId: appwrite.tables.friendships,
+      queries: [Query.equal('userA', userId)],
+    }),
+    tablesDB.listRows({
+      databaseId: appwrite.databaseId,
+      tableId: appwrite.tables.friendships,
+      queries: [Query.equal('userB', userId)],
+    }),
+  ])
+
+  return Array.from(
+    new Set(
+      ([...asA.rows, ...asB.rows] as unknown as FriendshipRow[]).map((row) =>
+        row.userA === userId ? row.userB : row.userA,
+      ),
+    ),
+  )
 }
 
 // Heartbeats run through the server fn so that the admin client can stamp the right
@@ -35,6 +64,7 @@ export const upsertPresenceServer = createServerFn({ method: 'POST' })
     const user = await account.get()
     const { client: adminClient } = createAdminClient()
     const adminPresences = new Presences(adminClient)
+    const friendIds = await listFriendIdsForPresence(user.$id)
     await adminPresences.upsert({
       presenceId: user.$id,
       userId: user.$id,
@@ -42,7 +72,7 @@ export const upsertPresenceServer = createServerFn({ method: 'POST' })
       metadata: data.metadata,
       expiresAt: expiresAtFromNow(appwrite.presenceTtlMs),
       permissions: [
-        Permission.read(Role.users()),
+        ...[user.$id, ...friendIds].map((id) => Permission.read(Role.user(id))),
         Permission.update(Role.user(user.$id)),
         Permission.delete(Role.user(user.$id)),
       ],

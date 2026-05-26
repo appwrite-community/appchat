@@ -16,7 +16,7 @@ export const appwrite = {
     serveSnap: 'serve-snap',
   },
   sessionCookie: 'a_session_appchat',
-  heartbeatIntervalMs: 5_000,
-  presenceTtlMs: 24 * 60 * 60 * 1000,
+  heartbeatIntervalMs: 15_000,
+  presenceTtlMs: 60_000,
   snapTtlMs: 24 * 60 * 60 * 1000,
 } as const

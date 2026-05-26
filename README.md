@@ -50,7 +50,7 @@ Set a server-side API key for local SSR/admin operations:
 cp .env.example .env
 ```
 
-Then fill in `APPWRITE_API_KEY` with a key that can read users, read/write rows, and write presences. For deployed Appwrite Sites, add the same value as a Site environment variable.
+Then fill in `APPWRITE_API_KEY` with a key that can read users, read/write rows, read/write files, and write presences. For deployed Appwrite Sites, add the same value as a Site environment variable and as a Function environment variable for `serve-snap`.
 
 ## Run locally
 
