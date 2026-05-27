@@ -60,7 +60,6 @@ export const sendSnapServer = createServerFn({ method: 'POST' })
       permissions: [
         Permission.read(Role.user(me.$id)),
         Permission.read(Role.user(data.recipientId)),
-        Permission.update(Role.user(data.recipientId)),
         Permission.delete(Role.user(me.$id)),
       ],
     })
@@ -132,8 +131,18 @@ export const markSnapViewedServer = createServerFn({ method: 'POST' })
   .inputValidator((data: { snapId: string }) => data)
   .handler(async ({ data }) => {
     const { account, tablesDB: sessionTablesDB } = createSessionClient()
-    await account.get()
-    await sessionTablesDB.updateRow({
+    const me = await account.get()
+    const snap = await sessionTablesDB.getRow({
+      databaseId: appwrite.databaseId,
+      tableId: appwrite.tables.snaps,
+      rowId: data.snapId,
+    })
+    if (snap.recipientId !== me.$id) {
+      throw new Error("cannot mark another user's snap as viewed")
+    }
+
+    const { tablesDB: adminTablesDB } = createAdminClient()
+    await adminTablesDB.updateRow({
       databaseId: appwrite.databaseId,
       tableId: appwrite.tables.snaps,
       rowId: data.snapId,
@@ -151,10 +160,9 @@ export const fetchSnapImageServer = createServerFn({ method: 'GET' })
   .handler(async ({ data }) => {
     const { account, functions: sessionFunctions } = createSessionClient()
     await account.get()
-    const jwt = await account.createJWT()
     const exec = await sessionFunctions.createExecution({
       functionId: appwrite.functions.serveSnap,
-      xpath: `/snap/${data.snapId}?token=${encodeURIComponent(jwt.jwt)}`,
+      xpath: `/snap/${data.snapId}`,
       method: ExecutionMethod.GET,
     })
     if (exec.responseStatusCode !== 200) {

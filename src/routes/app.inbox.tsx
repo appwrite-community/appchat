@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import {
-  fetchSnapImage,
+  fetchSnapImageFromBrowserSession,
   listInboxSnaps,
   markSnapViewed,
   SNAP_RECEIVED_EVENT,
@@ -104,7 +104,7 @@ function SnapViewer({
 
   useEffect(() => {
     let live = true
-    fetchSnapImage(snapId)
+    fetchSnapImageFromBrowserSession(snapId)
       .then((url) => {
         if (!live) return
         setSrc(url)

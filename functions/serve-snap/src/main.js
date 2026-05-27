@@ -1,4 +1,4 @@
-import { Client, TablesDB, Storage, AppwriteException } from 'node-appwrite'
+import { Client, TablesDB, Storage } from 'node-appwrite'
 
 const DATABASE_ID = 'appchat-db'
 const SNAPS_TABLE_ID = 'snaps'
@@ -20,12 +20,15 @@ export default async ({ req, res, log, error }) => {
   }
   const snapId = match[1]
 
-  const jwt = req.headers['x-appwrite-user-jwt'] || req.query?.token
+  const jwt = req.headers['x-appwrite-user-jwt']
   if (!jwt) return unauthorized(res)
 
   const endpoint = process.env.APPWRITE_FUNCTION_API_ENDPOINT
   const projectId = process.env.APPWRITE_FUNCTION_PROJECT_ID
-  const apiKey = process.env.APPWRITE_API_KEY
+  const executionKey = req.headers['x-appwrite-key']
+  const apiKey = executionKey?.startsWith('ephemeral_')
+    ? executionKey
+    : process.env.APPWRITE_API_KEY
   if (!apiKey) {
     error('APPWRITE_API_KEY env var is not set')
     return res.json({ message: 'internal error' }, 500)
@@ -36,6 +39,9 @@ export default async ({ req, res, log, error }) => {
     .setProject(projectId)
     .setJWT(jwt)
   const callerTables = new TablesDB(callerClient)
+  const callerId =
+    process.env.APPWRITE_FUNCTION_USER_ID || req.headers['x-appwrite-user-id']
+  if (!callerId) return unauthorized(res)
 
   let snap
   try {
@@ -45,12 +51,14 @@ export default async ({ req, res, log, error }) => {
       rowId: snapId,
     })
   } catch (e) {
-    if (e instanceof AppwriteException && (e.code === 401 || e.code === 404)) {
+    if (e.code === 401 || e.code === 404) {
       return unauthorized(res)
     }
     error(e.message)
     return res.json({ message: 'internal error' }, 500)
   }
+
+  if (snap.recipientId !== callerId) return unauthorized(res)
 
   const ageMs = Date.now() - new Date(snap.$createdAt).getTime()
   if (ageMs > SNAP_TTL_MS) return expired(res)
